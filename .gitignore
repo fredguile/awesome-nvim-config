@@ -1,5 +1,6 @@
 # Neovim runtime files
 lazy-lock.json
+lazyvim.json
 
 # Plugin data directories
 plugin/
