@@ -1,0 +1,18 @@
+# Neovim runtime files
+lazy-lock.json
+
+# Plugin data directories
+plugin/
+spell/
+
+# Session files
+*.vim
+Session.vim
+
+# Temporary files
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
