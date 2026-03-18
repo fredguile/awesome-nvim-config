@@ -40,22 +40,25 @@ nvim
 
 - **Personalization**: Neovim configs are highly personal. What works for me might not work for you.
 - **Control**: You'll have full control over your configuration and can customize it freely.
-- **Updates**: You can still pull updates from my repo when you want, but on your own terms.
 - **Learning**: Forking encourages you to understand and modify the config rather than blindly using someone else's setup.
 
 ### Syncing Updates from Upstream
 
-If you've forked the repo and want to pull in my latest changes:
+**⚠️ I do not recommend pulling updates from my repo.** Instead, I encourage you to own your forked configuration, which will naturally diverge from mine as you customize it to your needs. Your fork should reflect your unique workflow and preferences, not be kept in sync with my changes.
+
+If you're curious about my updates, you can:
 
 ```bash
-# Add the original repo as upstream (one-time setup)
+# Add the original repo as upstream (optional)
 cd ~/.config/nvim
 git remote add upstream https://github.com/fredguile/awesome-nvim-config.git
 
-# Pull and merge updates when desired
+# View my changes (without merging)
 git fetch upstream
-git merge upstream/master
+git log --oneline upstream/master
 ```
+
+Then selectively cherry-pick changes that interest you, rather than merging wholesale.
 
 ## Structure
 
