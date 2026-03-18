@@ -98,7 +98,8 @@ Feel free to delete anything you don't need and add what you want!
 ## Credits
 
 - Based on [LazyVim](https://www.lazyvim.org/)
-- Inspired by the amazing Neovim community
+- Inspired by [@hadynz's dotfiles](https://github.com/hadynz/dotfiles) - huge help in building this config!
+- Thanks to the amazing Neovim community
 
 ## License
 
