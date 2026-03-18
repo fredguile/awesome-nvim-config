@@ -36,6 +36,16 @@ git clone https://github.com/YOUR-USERNAME/awesome-nvim-config.git ~/.config/nvi
 nvim
 ```
 
+### ⚠️ Important First Step: Check Health
+
+**On your first Neovim start, you MUST run `:checkhealth` to verify dependencies.** Many plugins depend on external binaries that require separate installation (ripgrep, fd, tree-sitter CLI, language servers, formatters, linters, etc.).
+
+```vim
+:checkhealth
+```
+
+This will show you what's missing and guide you on what to install. Don't skip this step or you'll encounter errors and missing functionality!
+
 ### Why Fork?
 
 - **Personalization**: Neovim configs are highly personal. What works for me might not work for you.
