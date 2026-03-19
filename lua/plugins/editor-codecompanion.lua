@@ -39,6 +39,9 @@ return {
 		},
 	},
 	config = function()
+		-- Apply patches to fix nil value errors before CodeCompanion initializes
+		local codecompanion_fix = require("config.codecompanion-fix")
+		
 		local log = require("codecompanion.utils.log")
 
 		local function preferred_acp_adapter()
@@ -81,8 +84,17 @@ return {
 			end
 		end
 
-		require("codecompanion").setup({
-			opts = cc_opts,
+		-- Explicitly set opts fields to ensure they exist and avoid nil errors
+		-- Merge with any desired overrides
+		local setup_opts = vim.tbl_deep_extend("force", {
+			-- Ensure core opts fields exist
+			log_level = "DEBUG",
+			language = "English", -- Explicit default to avoid nil errors
+		}, cc_opts or {})
+
+		local codecompanion = require("codecompanion")
+		codecompanion.setup({
+			opts = setup_opts,
 			strategies = {
 				chat = { adapter = default_adapter },
 				inline = { adapter = default_adapter },
@@ -345,6 +357,9 @@ return {
 				},
 			},
 		})
+		
+		-- Apply patches after setup to fix any remaining nil value issues
+		codecompanion_fix.apply_patches()
 
 		-- Disable file logging to prevent logging to ~/.local/state/nvim/codecompanion.log
 		log.set_root(log.new({
