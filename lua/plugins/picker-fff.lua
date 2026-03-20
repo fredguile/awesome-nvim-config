@@ -2,8 +2,8 @@ return {
 	"dmtrKovalenko/fff.nvim",
 
 	-- Track latest fff.nvim.
-	-- Native backend is built locally using Rust nightly (required by upstream).
-	build = "rustup run nightly cargo build --release",
+	-- Native backend is built locally using stable Rust.
+	build = "cargo build --release",
 
 	-- No need to lazy-load with lazy.nvim.
 	-- This plugin initializes itself lazily.
@@ -52,10 +52,10 @@ return {
 				local function build_backend(reason)
 					local plugin_dir = vim.fn.stdpath("data") .. "/lazy/fff.nvim"
 					vim.notify(
-						"fff.nvim: rebuilding native backend (nightly)" .. (reason and (" (" .. reason .. ")") or ""),
+						"fff.nvim: rebuilding native backend" .. (reason and (" (" .. reason .. ")") or ""),
 						vim.log.levels.WARN
 					)
-					vim.system({ "rustup", "run", "nightly", "cargo", "build", "--release" }, { cwd = plugin_dir }, function(res)
+					vim.system({ "cargo", "build", "--release" }, { cwd = plugin_dir }, function(res)
 						vim.schedule(function()
 							if res.code == 0 then
 								vim.notify("fff.nvim: native backend rebuilt. Please restart Neovim, then run grep again.", vim.log.levels.INFO)
@@ -103,8 +103,8 @@ return {
 			local missing_symbols = ok_rust and type(rust.live_grep) ~= "function"
 
 			if stale or missing_symbols then
-				vim.notify("fff.nvim: rebuilding native backend (nightly) in background…", vim.log.levels.WARN)
-				vim.system({ "rustup", "run", "nightly", "cargo", "build", "--release" }, { cwd = plugin_dir }, function(res)
+				vim.notify("fff.nvim: rebuilding native backend in background…", vim.log.levels.WARN)
+				vim.system({ "cargo", "build", "--release" }, { cwd = plugin_dir }, function(res)
 					vim.schedule(function()
 						if res.code == 0 then
 							vim.notify("fff.nvim: native backend rebuilt. Restart Neovim to load it.", vim.log.levels.INFO)
