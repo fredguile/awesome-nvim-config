@@ -45,6 +45,10 @@ require("lazy").setup({
 		-- have outdated releases, which may break your Neovim install.
 		version = false, -- always use the latest git commit
 		-- version = "*", -- try installing the latest stable version for plugins that support semver
+		-- Increase build timeout to 2 minutes (120 seconds) for Rust compilation (fff.nvim and similar plugins)
+		build = {
+			timeout = 120, -- timeout in seconds for build commands
+		},
 	},
 	install = { colorscheme = { "tokyonight", "habamax", "catppuccin", "slate" } },
 	checker = { enabled = true }, -- automatically check for plugin updates
