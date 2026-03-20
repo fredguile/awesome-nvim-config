@@ -3,7 +3,9 @@ return {
 
 	-- Track latest fff.nvim.
 	-- Native backend is built locally using stable Rust.
-	build = "cargo build --release",
+	build = function()
+	  require("fff.download").download_or_build_binary()
+	end,
 
 	-- No need to lazy-load with lazy.nvim.
 	-- This plugin initializes itself lazily.
