@@ -136,12 +136,24 @@ return {
 			"ff",
 			function()
 				local fff = require("fff")
-				local cwd = vim.fn.expand("%:p:h")
-				if type(fff.find_files) == "function" then
-					fff.find_files({ cwd = cwd })
-				else
-					vim.notify("fff.find_files() not available; falling back to git root", vim.log.levels.WARN)
+				
+				-- Try to detect git root without re-initializing the picker
+				local ok_fuzzy, fuzzy = pcall(require, "fff.fuzzy")
+				local git_root = nil
+				if ok_fuzzy and type(fuzzy.get_git_root) == "function" then
+					ok_fuzzy, git_root = pcall(fuzzy.get_git_root)
+				end
+				
+				if git_root then
+					-- Option 2: In a git repo (includes worktrees) - use git root explicitly
 					fff.find_in_git_root()
+				else
+					-- Option 1: Not in a git repo - use auto-detection
+					if type(fff.find_files) == "function" then
+						fff.find_files()
+					else
+						vim.notify("fff.find_files() not available", vim.log.levels.WARN)
+					end
 				end
 			end,
 			desc = "Find files",
