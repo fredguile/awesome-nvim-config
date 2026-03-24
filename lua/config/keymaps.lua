@@ -122,8 +122,16 @@ local function open_lazygit()
 
 	local function launch(dir)
 		if has_snacks and Snacks.lazygit then
+			-- MONOREPO OPTIMIZATION: Set git env vars to speed up operations
+			-- These work together with lazygit config and git repo config
+			local env = {
+				-- Disable expensive ahead/behind calculations
+				GIT_OPTIONAL_LOCKS = "0",
+			}
+			
 			return Snacks.lazygit({
 				cwd = dir,
+				env = env,
 				win = {
 					style = "lazygit",
 					title = "LazyGit",
