@@ -30,6 +30,18 @@ return {
 				refresh_and_clear(args.buf)
 			end,
 		})
+
+		vim.api.nvim_create_autocmd("User", {
+			pattern = { "DiffviewFileOpened", "DiffviewPanelTOGGLE" },
+			callback = function()
+				vim.schedule(function()
+					local buf = vim.api.nvim_get_current_buf()
+					if vim.api.nvim_buf_is_valid(buf) then
+						pcall(git_conflict.clear, buf)
+					end
+				end)
+			end,
+		})
 	end,
 }
 
