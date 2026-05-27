@@ -296,8 +296,7 @@ return {
 										vim.env.USER_API_TOKEN = token
 									end
 
-									local ok = (email and email ~= "") and (token and token ~= "")
-									if not ok then
+									if not ((email and email ~= "") and (token and token ~= "")) then
 										local home = vim.env.HOME or ""
 										local path = vim.env.PATH or ""
 										vim.notify(
@@ -312,7 +311,13 @@ return {
 											vim.log.levels.ERROR
 										)
 									end
-									return ok
+
+									-- Return false so CodeCompanion falls through to send the
+									-- `authenticate` RPC to the acli process.  acli rovodev acp
+									-- requires the JSON-RPC authenticate handshake (methodId =
+									-- "product-login") regardless of env-var presence; returning
+									-- true here would skip that call and cause session/new to fail.
+									return false
 								end,
 
 								form_messages = function(self, messages, capabilities)
@@ -361,7 +366,7 @@ return {
 		-- Apply patches after setup to fix any remaining nil value issues
 		codecompanion_fix.apply_patches()
 
-		-- Disable file logging to prevent logging to ~/.local/state/nvim/codecompanion.log
+		-- Disable file logging to prevent logging conversations to disk
 		log.set_root(log.new({
 			handlers = {
 				{
