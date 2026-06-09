@@ -247,8 +247,45 @@ return {
 							env = (function()
 								-- IMPORTANT: ensure the spawned `acli` process inherits a full environment
 								local env = vim.fn.environ()
-								env.USER_EMAIL = env.USER_EMAIL or vim.env.USER_EMAIL
-								env.USER_API_TOKEN = env.USER_API_TOKEN or vim.env.USER_API_TOKEN
+
+								-- Read email and accountId from ~/.config/acli/rovodev_config.yaml
+								local function read_rovodev_config()
+									local config_path = (vim.env.HOME or "") .. "/.config/acli/rovodev_config.yaml"
+									local f = io.open(config_path, "r")
+									if not f then return nil, nil end
+									local content = f:read("*a")
+									f:close()
+									local email = content:match("email:%s*([^\n]+)")
+									local account_id = content:match("accountId:%s*([^\n]+)")
+									if email then email = email:match("^%s*(.-)%s*$") end
+									if account_id then account_id = account_id:match("^%s*(.-)%s*$") end
+									return email, account_id
+								end
+
+								-- Retrieve API token from macOS keychain via `security` CLI.
+								-- The stored value is prefixed with "go-keyring-base64:" and base64-encoded.
+								local function read_keychain_token()
+									local handle = io.popen("security find-generic-password -s 'acli' -w 2>/dev/null")
+									if not handle then return nil end
+									local raw = handle:read("*a")
+									handle:close()
+									raw = raw and raw:match("^%s*(.-)%s*$") or ""
+									if raw == "" then return nil end
+									-- Strip the go-keyring-base64: prefix then base64-decode
+									local b64 = raw:match("^go%-keyring%-base64:(.+)$") or raw
+									local dec_handle = io.popen(string.format("printf '%%s' '%s' | base64 -d 2>/dev/null", b64))
+									if not dec_handle then return nil end
+									local token = dec_handle:read("*a")
+									dec_handle:close()
+									token = token and token:match("^%s*(.-)%s*$") or ""
+									return token ~= "" and token or nil
+								end
+
+								local cfg_email, _ = read_rovodev_config()
+								local keychain_token = read_keychain_token()
+
+								env.USER_EMAIL = cfg_email or env.USER_EMAIL or vim.env.USER_EMAIL
+								env.USER_API_TOKEN = keychain_token or env.USER_API_TOKEN or vim.env.USER_API_TOKEN
 								return env
 							end)(),
 
@@ -282,8 +319,8 @@ return {
 								-- Ensure the spawned `acli` process sees these values.
 								-- (CodeCompanion also passes env via ACP, but exporting is a safe fallback.)
 								auth = function(self)
-									-- Prefer values from the adapter env (after replacement), but fall back to
-									-- current Neovim environment.
+									-- Prefer values resolved at adapter-init time (from keychain / config file),
+									-- then fall back to the current Neovim environment as a last resort.
 									local email = (self.env_replaced and self.env_replaced.USER_EMAIL)
 										or vim.env.USER_EMAIL
 									local token = (self.env_replaced and self.env_replaced.USER_API_TOKEN)
@@ -297,17 +334,9 @@ return {
 									end
 
 									if not ((email and email ~= "") and (token and token ~= "")) then
-										local home = vim.env.HOME or ""
-										local path = vim.env.PATH or ""
 										vim.notify(
-											(
-												"RovoDev CLI: missing USER_EMAIL/USER_API_TOKEN in environment "
-												.. "(HOME="
-												.. (home ~= "" and "set" or "missing")
-												.. ", PATH="
-												.. (path ~= "" and "set" or "missing")
-												.. ")"
-											),
+											"RovoDev CLI: could not resolve USER_EMAIL / USER_API_TOKEN. "
+											.. "Check ~/.config/acli/rovodev_config.yaml and the 'acli' macOS keychain entry.",
 											vim.log.levels.ERROR
 										)
 									end
