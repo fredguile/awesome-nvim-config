@@ -48,10 +48,12 @@ local function load_twoslash_queries()
 	end
 end
 
+-- Disabled in favour of tsgo (lua/plugins/lsp-tsgo.lua), which is the Go-based
+-- TypeScript 7 language server with better JSDoc hover support.
 return {
 	"pmizio/typescript-tools.nvim",
 	dependencies = { "nvim-lua/plenary.nvim", "neovim/nvim-lspconfig", "marilari88/twoslash-queries.nvim" },
-	enabled = true,
+	enabled = false,
 	ft = {
 		"typescript",
 		"javascript",

@@ -279,7 +279,8 @@ return {
 			"stylua", -- Used to format Lua code
 			"prettier", -- Used to format CSS/HTML/JSON/YAML/Markdown
 			"eslint_d", -- Used to format JS/TS/JSX/TSX with eslint
-			"typescript-language-server", -- LSP server used by typescript-tools.nvim
+			-- "typescript-language-server", -- replaced by tsgo (see lua/plugins/lsp-tsgo.lua)
+			"tsgo", -- TypeScript 7 Go-based language server
 			"google-java-format", -- Used to format Java code
 			"graphql-language-service-cli", -- Provides graphql-lsp
 		})
@@ -299,7 +300,7 @@ return {
 					server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
 					require("lspconfig")[server_name].setup(server)
 				end,
-				-- typescript-tools.nvim manages its own tsserver instance, so we
+				-- tsgo (see lua/plugins/lsp-tsgo.lua) manages TypeScript LSP, so we
 				-- prevent mason-lspconfig from also spinning up ts_ls.
 				ts_ls = function() end,
 			},
