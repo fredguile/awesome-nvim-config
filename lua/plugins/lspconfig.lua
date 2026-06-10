@@ -299,6 +299,9 @@ return {
 					server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
 					require("lspconfig")[server_name].setup(server)
 				end,
+				-- typescript-tools.nvim manages its own tsserver instance, so we
+				-- prevent mason-lspconfig from also spinning up ts_ls.
+				ts_ls = function() end,
 			},
 		})
 	end,
