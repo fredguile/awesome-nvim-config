@@ -41,7 +41,7 @@ return {
 	config = function()
 		-- Apply patches to fix nil value errors before CodeCompanion initializes
 		local codecompanion_fix = require("config.codecompanion-fix")
-		
+
 		local log = require("codecompanion.utils.log")
 
 		local function preferred_acp_adapter()
@@ -169,7 +169,7 @@ return {
 							---Model for generating titles (defaults to current chat model)
 							model = title_model,
 							---Number of user prompts after which to refresh the title (0 to disable)
-							refresh_every_n_prompts = 0, -- e.g., 3 to refresh after every 3rd user prompt
+							refresh_every_n_prompts = 3, -- e.g., 3 to refresh after every 3rd user prompt
 							---Maximum number of times to refresh the title (default: 3)
 							max_refreshes = 3,
 							format_title = function(original_title)
@@ -231,12 +231,13 @@ return {
 					-- If we override `adapters.acp` without including these, CodeCompanion can
 					-- mis-detect adapter types (e.g. treating `opencode` as HTTP) and crash.
 					opencode = "opencode",
+					claude_code = "claude_code",
 					rovodev = function()
 						local helpers = require("codecompanion.adapters.acp.helpers")
 						return {
 							name = "rovodev",
 							type = "acp",
-							formatted_name = "RovoDev",
+							formatted_name = "Atlassian RovoDev",
 							roles = {
 								llm = "assistant",
 								user = "user",
@@ -252,13 +253,19 @@ return {
 								local function read_rovodev_config()
 									local config_path = (vim.env.HOME or "") .. "/.config/acli/rovodev_config.yaml"
 									local f = io.open(config_path, "r")
-									if not f then return nil, nil end
+									if not f then
+										return nil, nil
+									end
 									local content = f:read("*a")
 									f:close()
 									local email = content:match("email:%s*([^\n]+)")
 									local account_id = content:match("accountId:%s*([^\n]+)")
-									if email then email = email:match("^%s*(.-)%s*$") end
-									if account_id then account_id = account_id:match("^%s*(.-)%s*$") end
+									if email then
+										email = email:match("^%s*(.-)%s*$")
+									end
+									if account_id then
+										account_id = account_id:match("^%s*(.-)%s*$")
+									end
 									return email, account_id
 								end
 
@@ -266,15 +273,22 @@ return {
 								-- The stored value is prefixed with "go-keyring-base64:" and base64-encoded.
 								local function read_keychain_token()
 									local handle = io.popen("security find-generic-password -s 'acli' -w 2>/dev/null")
-									if not handle then return nil end
+									if not handle then
+										return nil
+									end
 									local raw = handle:read("*a")
 									handle:close()
 									raw = raw and raw:match("^%s*(.-)%s*$") or ""
-									if raw == "" then return nil end
+									if raw == "" then
+										return nil
+									end
 									-- Strip the go-keyring-base64: prefix then base64-decode
 									local b64 = raw:match("^go%-keyring%-base64:(.+)$") or raw
-									local dec_handle = io.popen(string.format("printf '%%s' '%s' | base64 -d 2>/dev/null", b64))
-									if not dec_handle then return nil end
+									local dec_handle =
+										io.popen(string.format("printf '%%s' '%s' | base64 -d 2>/dev/null", b64))
+									if not dec_handle then
+										return nil
+									end
 									local token = dec_handle:read("*a")
 									dec_handle:close()
 									token = token and token:match("^%s*(.-)%s*$") or ""
@@ -336,7 +350,7 @@ return {
 									if not ((email and email ~= "") and (token and token ~= "")) then
 										vim.notify(
 											"RovoDev CLI: could not resolve USER_EMAIL / USER_API_TOKEN. "
-											.. "Check ~/.config/acli/rovodev_config.yaml and the 'acli' macOS keychain entry.",
+												.. "Check ~/.config/acli/rovodev_config.yaml and the 'acli' macOS keychain entry.",
 											vim.log.levels.ERROR
 										)
 									end
@@ -391,7 +405,7 @@ return {
 				},
 			},
 		})
-		
+
 		-- Apply patches after setup to fix any remaining nil value issues
 		codecompanion_fix.apply_patches()
 
