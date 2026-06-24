@@ -356,17 +356,6 @@ return {
 							},
 						}
 					end,
-					claude_code = function()
-						-- Read the OAuth token from the host environment (injected by chezmoi
-						-- from an age-encrypted template). Falls back to an empty string so the
-						-- adapter still registers; downstream CLI invocations will surface an
-						-- auth error if the token is missing.
-						return require("codecompanion.adapters").extend("claude_code", {
-							env = {
-								CLAUDE_CODE_OAUTH_TOKEN = vim.env.CLAUDE_CODE_OAUTH_TOKEN or "",
-							},
-						})
-					end,
 				},
 				http = {
 					ollama = function()
