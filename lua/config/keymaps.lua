@@ -243,6 +243,13 @@ map("i", "<Esc>", function()
 	require("snacks.notifier").hide()
 end, { desc = "Exit insert + clear highlight" })
 
+-- jk as Esc alternative (home-row friendly)
+map("i", "jk", function()
+	vim.cmd([[stopinsert]])
+	vim.cmd([[nohl]])
+	require("snacks.notifier").hide()
+end, { desc = "Exit insert + clear highlight (jk)" })
+
 -- Invoke VIM command to move j/k directions + keep cursor centered for any buffers with line numbers
 -- This method means all plugin buffers will be excluded and use standard vim behaviour
 local keep_cursor_centered = function(jk_direction)
