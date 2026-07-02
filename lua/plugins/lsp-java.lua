@@ -82,9 +82,6 @@ end
 return {
 	"nvim-java/nvim-java",
 	lazy = false,
-	-- Fix: nvim-java hardcodes 'milestones/' URL but 1.54.0 moved to 'snapshots/'
-	-- Patch the pkgm URL template after install/update
-	build = "sed -i 's|/milestones/|/snapshots/|g' lua/pkgm/specs/init.lua",
 	keys = {
 		{
 			"<leader>jb",
