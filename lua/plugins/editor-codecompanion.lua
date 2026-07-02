@@ -63,7 +63,7 @@ return {
 			-- This avoids CodeCompanion's HTTP client calling `adapter.schema.model.default()` without `self`,
 			-- which breaks the built-in Ollama adapter (its default is a function(self, opts)).
 			title_adapter = "ollama_title"
-			title_model = "alibayram/smollm3:latest"
+			title_model = "smollm2:135m"
 		end
 
 		-- Debug-only, one-time notification showing which adapter is selected.
