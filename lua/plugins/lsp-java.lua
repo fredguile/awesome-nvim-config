@@ -98,16 +98,19 @@ local JDTLS_JAVA_TO = 25
 ---   2. pkgm.specs (init.lua)              accepts the version (version_range)
 ---   3. java-core.constants.java_version   passes Java runtime validation
 --- No files on disk are modified, so lazy.nvim never sees a dirty plugin repo.
+---
+--- Called from lazy `init` (before plugin loads) so modules are patched before
+--- nvim-java's own require() calls cache them.
 local function patch_nvim_java_modules()
-	-- 1. Extend the version-map with our timestamp
+	-- 1. Extend the version-map with our timestamp.
+	--    Force-load it now so we can mutate the cached table before nvim-java reads it.
 	local ok_vmap, vmap = pcall(require, "pkgm.specs.jdtls-spec.version-map")
 	if ok_vmap and not vmap[JDTLS_VERSION] then
 		vmap[JDTLS_VERSION] = JDTLS_TIMESTAMP
 	end
 
-	-- 2. Widen the version_range in the jdtls PackageSpec so is_match() accepts 1.60.0.
-	--    specs/init.lua returns a plain table of Spec objects; we find the jdtls one
-	--    and update its internal _version_range field.
+	-- 2. Widen the version_range in the jdtls PackageSpec so is_match() accepts JDTLS_VERSION.
+	--    Force-load specs now so the cached table has the widened range.
 	local ok_specs, specs = pcall(require, "pkgm.specs")
 	if ok_specs then
 		for _, spec in ipairs(specs) do
@@ -119,7 +122,7 @@ local function patch_nvim_java_modules()
 		end
 	end
 
-	-- 3. Extend the java_version constants table
+	-- 3. Extend the java_version constants table.
 	local ok_jver, jver = pcall(require, "java-core.constants.java_version")
 	if ok_jver and not jver[JDTLS_VERSION] then
 		jver[JDTLS_VERSION] = { from = JDTLS_JAVA_FROM, to = JDTLS_JAVA_TO }
@@ -129,6 +132,7 @@ end
 return {
 	"nvim-java/nvim-java",
 	lazy = false,
+	init = patch_nvim_java_modules,
 	keys = {
 		{
 			"<leader>jb",
