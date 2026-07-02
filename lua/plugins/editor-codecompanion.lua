@@ -420,12 +420,7 @@ return {
 					type = "notify",
 					level = vim.log.levels.WARN,
 				},
-				-- File handler temporarily re-enabled for debugging
-				{
-					type = "file",
-					filename = "codecompanion.log",
-					level = vim.log.levels.DEBUG,
-				},
+				-- File handler removed to disable logging conversations
 			},
 		}))
 
