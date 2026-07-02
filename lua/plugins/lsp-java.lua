@@ -79,90 +79,56 @@ end
 
 -- https://github.com/nvim-java/nvim-java
 --
--- nvim-java bundles its own jdtls downloader. When the hardcoded jdtls version
--- is no longer available on Eclipse's servers, the build hook below patches the
--- three internal files that need updating so Neovim continues to work after a
--- `lazy` plugin update. Update JDTLS_VERSION and JDTLS_TIMESTAMP when a newer
+-- nvim-java bundles its own jdtls downloader. The hardcoded jdtls version in
+-- nvim-java may become unavailable on Eclipse's servers over time. Rather than
+-- patching plugin files on disk (which makes lazy.nvim complain about dirty git
+-- state), we monkey-patch the Lua module cache at runtime before nvim-java
+-- reads it. Only JDTLS_VERSION and JDTLS_TIMESTAMP need updating when a newer
 -- jdtls milestone is released at:
 --   https://download.eclipse.org/jdtls/milestones/
 
 local JDTLS_VERSION = "1.60.0"
 local JDTLS_TIMESTAMP = "202606262232"
--- Java version range that this jdtls release supports (for validation)
+-- Java version range that this jdtls release supports
 local JDTLS_JAVA_FROM = 21
 local JDTLS_JAVA_TO = 25
 
-local function patch_nvim_java()
-	local plugin_root = vim.fn.stdpath("data") .. "/lazy/nvim-java"
+--- Inject our jdtls version into the nvim-java Lua module cache so that:
+---   1. pkgm.specs.jdtls-spec.version-map  knows the download timestamp
+---   2. pkgm.specs (init.lua)              accepts the version (version_range)
+---   3. java-core.constants.java_version   passes Java runtime validation
+--- No files on disk are modified, so lazy.nvim never sees a dirty plugin repo.
+local function patch_nvim_java_modules()
+	-- 1. Extend the version-map with our timestamp
+	local ok_vmap, vmap = pcall(require, "pkgm.specs.jdtls-spec.version-map")
+	if ok_vmap and not vmap[JDTLS_VERSION] then
+		vmap[JDTLS_VERSION] = JDTLS_TIMESTAMP
+	end
 
-	-- 1. version-map.lua  (jdtls download URL timestamp)
-	local vmap_path = plugin_root .. "/lua/pkgm/specs/jdtls-spec/version-map.lua"
-	local vmap = io.open(vmap_path, "r")
-	if vmap then
-		local content = vmap:read("*a")
-		vmap:close()
-		if not content:find(JDTLS_VERSION, 1, true) then
-			local entry = string.format("\t['%s'] = '%s',\n}", JDTLS_VERSION, JDTLS_TIMESTAMP)
-			content = content:gsub("}", entry, 1)
-			local f = io.open(vmap_path, "w")
-			if f then
-				f:write(content)
-				f:close()
+	-- 2. Widen the version_range in the jdtls PackageSpec so is_match() accepts 1.60.0.
+	--    specs/init.lua returns a plain table of Spec objects; we find the jdtls one
+	--    and update its internal _version_range field.
+	local ok_specs, specs = pcall(require, "pkgm.specs")
+	if ok_specs then
+		for _, spec in ipairs(specs) do
+			if spec._name == "jdtls" and spec._version_range then
+				if spec._version_range.to < JDTLS_VERSION then
+					spec._version_range.to = JDTLS_VERSION
+				end
 			end
 		end
 	end
 
-	-- 2. config.lua  (JDTLS_VERSION default + version map)
-	local conf_path = plugin_root .. "/lua/java/config.lua"
-	local conf = io.open(conf_path, "r")
-	if conf then
-		local content = conf:read("*a")
-		conf:close()
-		-- Update JDTLS_VERSION constant
-		content = content:gsub("local JDTLS_VERSION = '[^']*'", "local JDTLS_VERSION = '" .. JDTLS_VERSION .. "'")
-		-- Inject version map entry if missing
-		if not content:find(JDTLS_VERSION, 1, true) then
-			local entry = string.format(
-				"\t['%s'] = {\n\t\tlombok = '1.18.42',\n\t\tjava_test = '0.43.2',\n\t\tjava_debug_adapter = '0.58.3',\n\t\tspring_boot_tools = '1.55.1',\n\t\tjdk = '%d',\n\t},\n}",
-				JDTLS_VERSION,
-				JDTLS_JAVA_FROM
-			)
-			content = content:gsub("}\n\nlocal V", entry .. "\n\nlocal V", 1)
-		end
-		local f = io.open(conf_path, "w")
-		if f then
-			f:write(content)
-			f:close()
-		end
-	end
-
-	-- 3. java_version.lua  (Java runtime version range for validation)
-	local jver_path = plugin_root .. "/lua/java-core/constants/java_version.lua"
-	local jver = io.open(jver_path, "r")
-	if jver then
-		local content = jver:read("*a")
-		jver:close()
-		if not content:find(JDTLS_VERSION, 1, true) then
-			local entry = string.format(
-				"\t['%s'] = { from = %d, to = %d },\n}",
-				JDTLS_VERSION,
-				JDTLS_JAVA_FROM,
-				JDTLS_JAVA_TO
-			)
-			content = content:gsub("}", entry, 1)
-			local f = io.open(jver_path, "w")
-			if f then
-				f:write(content)
-				f:close()
-			end
-		end
+	-- 3. Extend the java_version constants table
+	local ok_jver, jver = pcall(require, "java-core.constants.java_version")
+	if ok_jver and not jver[JDTLS_VERSION] then
+		jver[JDTLS_VERSION] = { from = JDTLS_JAVA_FROM, to = JDTLS_JAVA_TO }
 	end
 end
 
 return {
 	"nvim-java/nvim-java",
 	lazy = false,
-	build = patch_nvim_java,
 	keys = {
 		{
 			"<leader>jb",
@@ -190,7 +156,11 @@ return {
 		},
 	},
 	config = function()
-		require("java").setup()
+		patch_nvim_java_modules()
+
+		require("java").setup({
+			jdtls = { version = JDTLS_VERSION },
+		})
 
 		vim.lsp.config("jdtls", {
 			settings = {
