@@ -81,6 +81,7 @@ end
 
 return {
 	"nvim-java/nvim-java",
+	version = "v4.1.0",
 	lazy = false,
 	keys = {
 		{
@@ -109,7 +110,11 @@ return {
 		},
 	},
 	config = function()
-		require("java").setup()
+		require("java").setup({
+			jdtls = {
+				version = "1.59.0",
+			},
+		})
 
 		vim.lsp.config("jdtls", {
 			settings = {
