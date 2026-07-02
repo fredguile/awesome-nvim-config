@@ -82,38 +82,9 @@ end
 return {
 	"nvim-java/nvim-java",
 	lazy = false,
-	-- Patch the hardcoded jdtls version map to add 1.59.0 (snapshots URL)
-	-- and update the default JDTLS_VERSION after install/update
-	build = function()
-		local config_path = vim.fn.stdpath("data") .. "/lazy/nvim-java/lua/java/config.lua"
-		local f = io.open(config_path, "r")
-		if not f then return end
-		local content = f:read("*a")
-		f:close()
-
-		-- Only patch if 1.59.0 is not already in the version map
-		if content:find("1.59.0") then return end
-
-		-- Add 1.59.0 entry and update default version
-		content = content:gsub(
-			"local JDTLS_VERSION = '1%.54%.0'",
-			"local JDTLS_VERSION = '1.59.0'"
-		)
-		content = content:gsub(
-			"%['1%.54%.0'%] = {",
-			"['1.54.0'] = {\n\t\tlombok = '1.18.42',\n\t\tjava_test = '0.43.2',\n\t\tjava_debug_adapter = '0.58.3',\n\t\tspring_boot_tools = '1.55.1',\n\t\tjdk = '25',\n\t},\n\t['1.59.0'] = {"
-		)
-		content = content:gsub(
-			"(%['1%.59%.0'%] = {[^}]*})",
-			"['1.59.0'] = {\n\t\tlombok = '1.18.42',\n\t\tjava_test = '0.43.2',\n\t\tjava_debug_adapter = '0.58.3',\n\t\tspring_boot_tools = '1.55.1',\n\t\tjdk = '21',\n\t}"
-		)
-
-		local out = io.open(config_path, "w")
-		if out then
-			out:write(content)
-			out:close()
-		end
-	end,
+	-- Fix: nvim-java hardcodes 'milestones/' URL but 1.54.0 moved to 'snapshots/'
+	-- Patch the pkgm URL template after install/update
+	build = "sed -i 's|/milestones/|/snapshots/|g' lua/pkgm/specs/init.lua",
 	keys = {
 		{
 			"<leader>jb",
@@ -141,11 +112,7 @@ return {
 		},
 	},
 	config = function()
-		require("java").setup({
-			jdtls = {
-				version = "1.59.0",
-			},
-		})
+		require("java").setup()
 
 		vim.lsp.config("jdtls", {
 			settings = {
