@@ -1,5 +1,3 @@
--- https://github.com/nvim-java/nvim-java
-
 local uv = vim.loop
 
 local function trim(str)
@@ -79,9 +77,92 @@ local function with_jdtls(command)
 	end
 end
 
+-- https://github.com/nvim-java/nvim-java
+--
+-- nvim-java bundles its own jdtls downloader. When the hardcoded jdtls version
+-- is no longer available on Eclipse's servers, the build hook below patches the
+-- three internal files that need updating so Neovim continues to work after a
+-- `lazy` plugin update. Update JDTLS_VERSION and JDTLS_TIMESTAMP when a newer
+-- jdtls milestone is released at:
+--   https://download.eclipse.org/jdtls/milestones/
+
+local JDTLS_VERSION = "1.60.0"
+local JDTLS_TIMESTAMP = "202606262232"
+-- Java version range that this jdtls release supports (for validation)
+local JDTLS_JAVA_FROM = 21
+local JDTLS_JAVA_TO = 25
+
+local function patch_nvim_java()
+	local plugin_root = vim.fn.stdpath("data") .. "/lazy/nvim-java"
+
+	-- 1. version-map.lua  (jdtls download URL timestamp)
+	local vmap_path = plugin_root .. "/lua/pkgm/specs/jdtls-spec/version-map.lua"
+	local vmap = io.open(vmap_path, "r")
+	if vmap then
+		local content = vmap:read("*a")
+		vmap:close()
+		if not content:find(JDTLS_VERSION, 1, true) then
+			local entry = string.format("\t['%s'] = '%s',\n}", JDTLS_VERSION, JDTLS_TIMESTAMP)
+			content = content:gsub("}", entry, 1)
+			local f = io.open(vmap_path, "w")
+			if f then
+				f:write(content)
+				f:close()
+			end
+		end
+	end
+
+	-- 2. config.lua  (JDTLS_VERSION default + version map)
+	local conf_path = plugin_root .. "/lua/java/config.lua"
+	local conf = io.open(conf_path, "r")
+	if conf then
+		local content = conf:read("*a")
+		conf:close()
+		-- Update JDTLS_VERSION constant
+		content = content:gsub("local JDTLS_VERSION = '[^']*'", "local JDTLS_VERSION = '" .. JDTLS_VERSION .. "'")
+		-- Inject version map entry if missing
+		if not content:find(JDTLS_VERSION, 1, true) then
+			local entry = string.format(
+				"\t['%s'] = {\n\t\tlombok = '1.18.42',\n\t\tjava_test = '0.43.2',\n\t\tjava_debug_adapter = '0.58.3',\n\t\tspring_boot_tools = '1.55.1',\n\t\tjdk = '%d',\n\t},\n}",
+				JDTLS_VERSION,
+				JDTLS_JAVA_FROM
+			)
+			content = content:gsub("}\n\nlocal V", entry .. "\n\nlocal V", 1)
+		end
+		local f = io.open(conf_path, "w")
+		if f then
+			f:write(content)
+			f:close()
+		end
+	end
+
+	-- 3. java_version.lua  (Java runtime version range for validation)
+	local jver_path = plugin_root .. "/lua/java-core/constants/java_version.lua"
+	local jver = io.open(jver_path, "r")
+	if jver then
+		local content = jver:read("*a")
+		jver:close()
+		if not content:find(JDTLS_VERSION, 1, true) then
+			local entry = string.format(
+				"\t['%s'] = { from = %d, to = %d },\n}",
+				JDTLS_VERSION,
+				JDTLS_JAVA_FROM,
+				JDTLS_JAVA_TO
+			)
+			content = content:gsub("}", entry, 1)
+			local f = io.open(jver_path, "w")
+			if f then
+				f:write(content)
+				f:close()
+			end
+		end
+	end
+end
+
 return {
 	"nvim-java/nvim-java",
 	lazy = false,
+	build = patch_nvim_java,
 	keys = {
 		{
 			"<leader>jb",
