@@ -1,4 +1,4 @@
-local uv = vim.loop
+local uv = vim.uv or vim.loop
 
 local function trim(str)
 	if type(str) ~= "string" then
@@ -111,7 +111,7 @@ local function patch_nvim_java_modules()
 
 	-- 2. Widen the version_range in the jdtls PackageSpec so is_match() accepts JDTLS_VERSION.
 	--    Force-load specs now so the cached table has the widened range.
-	local ok_specs, specs = pcall(require, "pkgm.specs")
+	local ok_specs, specs = pcall(require, "pkgm.specs.init")
 	if ok_specs then
 		for _, spec in ipairs(specs) do
 			if spec._name == "jdtls" and spec._version_range then
@@ -154,7 +154,7 @@ return {
 		},
 		{
 			"<leader>jo",
-			with_jdtls("JavaTestRunCurrentClass"),
+			with_jdtls("JavaTestViewLastReport"),
 			desc = "Java: Open last test report",
 			silent = true,
 		},
