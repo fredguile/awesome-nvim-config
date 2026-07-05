@@ -87,11 +87,18 @@ end
 -- jdtls milestone is released at:
 --   https://download.eclipse.org/jdtls/milestones/
 
-local JDTLS_VERSION = "1.60.0"
-local JDTLS_TIMESTAMP = "202606262232"
+local JDTLS_VERSION = "1.58.0"
+local JDTLS_TIMESTAMP = "202604151538"
 -- Java version range that this jdtls release supports
 local JDTLS_JAVA_FROM = 21
 local JDTLS_JAVA_TO = 25
+
+-- Locally-installed jdtls. When path is set, nvim-java skips the
+-- download from download.eclipse.org/jdtls/snapshots/ entirely.
+-- Sourced from Mason; matches JDTLS_VERSION above.
+-- Cross-platform: stdpath("data") resolves to the nvim data dir on
+-- Linux/macOS (~/.local/share/nvim) and Windows (%LOCALAPPDATA%\nvim-data).
+local JDTLS_PATH = vim.fn.stdpath("data") .. "/mason/packages/jdtls"
 
 --- Inject our jdtls version into the nvim-java Lua module cache so that:
 ---   1. pkgm.specs.jdtls-spec.version-map  knows the download timestamp
@@ -163,7 +170,10 @@ return {
 		patch_nvim_java_modules()
 
 		require("java").setup({
-			jdtls = { version = JDTLS_VERSION },
+			jdtls = {
+				version = JDTLS_VERSION,
+				path = JDTLS_PATH,
+			},
 		})
 
 		vim.lsp.config("jdtls", {
