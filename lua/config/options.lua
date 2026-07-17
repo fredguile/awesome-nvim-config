@@ -10,34 +10,48 @@ local opt = vim.opt
 
 -- Sync clipboard between OS and NeoVim after the UI is ready
 local function setup_clipboard()
-	if vim.env.SSH_CONNECTION then
-		return
-	end
-
 	vim.o.clipboard = "unnamedplus"
 
 	local is_wsl2 = vim.fn.has("wsl") == 1 and vim.loop.os_uname().release:match("WSL2")
-	if not is_wsl2 then
+	if is_wsl2 then
+		if vim.fn.executable("win32yank.exe") == 0 then
+			vim.notify("win32yank.exe not found; clipboard sync disabled", vim.log.levels.WARN)
+			return
+		end
+
+		vim.g.clipboard = {
+			name = "win32yank-wsl",
+			copy = {
+				["+"] = "win32yank.exe -i --crlf",
+				["*"] = "win32yank.exe -i --crlf",
+			},
+			paste = {
+				["+"] = "win32yank.exe -o --crlf",
+				["*"] = "win32yank.exe -o --crlf",
+			},
+			cache_enabled = 0,
+		}
 		return
 	end
 
-	if vim.fn.executable("win32yank.exe") == 0 then
-		vim.notify("win32yank.exe not found; clipboard sync disabled", vim.log.levels.WARN)
-		return
+	-- Over SSH there's no local clipboard tool to shell out to, so bridge the
+	-- clipboard through the terminal via OSC 52 instead. The terminal emulator
+	-- (e.g. iTerm2, kitty, WezTerm, Windows Terminal) forwards the escape
+	-- sequence to the local machine's OS clipboard on copy, and (if the
+	-- terminal supports the query response) returns its contents on paste.
+	if vim.env.SSH_CONNECTION then
+		vim.g.clipboard = {
+			name = "OSC 52",
+			copy = {
+				["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+				["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+			},
+			paste = {
+				["+"] = require("vim.ui.clipboard.osc52").paste("+"),
+				["*"] = require("vim.ui.clipboard.osc52").paste("*"),
+			},
+		}
 	end
-
-	vim.g.clipboard = {
-		name = "win32yank-wsl",
-		copy = {
-			["+"] = "win32yank.exe -i --crlf",
-			["*"] = "win32yank.exe -i --crlf",
-		},
-		paste = {
-			["+"] = "win32yank.exe -o --crlf",
-			["*"] = "win32yank.exe -o --crlf",
-		},
-		cache_enabled = 0,
-	}
 end
 
 vim.api.nvim_create_autocmd("UiEnter", {
