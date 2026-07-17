@@ -45,20 +45,25 @@ return {
 		local log = require("codecompanion.utils.log")
 
 		local function preferred_acp_adapter()
-			-- Prefer the RovoDev ACP adapter when the CLI is available.
-			-- Fall back to CodeCompanion's built-in OpenCode ACP adapter otherwise.
-			return (vim.fn.executable("acli") == 1) and "rovodev" or "opencode"
+			-- Prefer RovoDev (acli) when available, then standalone Rovo, then fall back to OpenCode.
+			if vim.fn.executable("acli") == 1 then
+				return "rovodev"
+			elseif vim.fn.executable("rovo") == 1 then
+				return "rovo"
+			else
+				return "opencode"
+			end
 		end
 
 		local default_adapter = preferred_acp_adapter()
 		local cc_opts = { log_level = "DEBUG" }
 
 		-- Title-generation adapter/model overrides
-		-- When using ACP (RovoDev), generate titles via a lightweight local Ollama model.
+		-- When using an ACP adapter (rovo/rovodev), generate titles via a lightweight local Ollama model.
 		-- This works around upstream limitations where title generation may fail with ACP adapters.
 		local title_adapter = nil
 		local title_model = nil
-		if default_adapter == "rovodev" then
+		if default_adapter == "rovodev" or default_adapter == "rovo" then
 			-- Use a dedicated HTTP adapter for title generation.
 			-- This avoids CodeCompanion's HTTP client calling `adapter.schema.model.default()` without `self`,
 			-- which breaks the built-in Ollama adapter (its default is a function(self, opts)).
@@ -91,6 +96,67 @@ return {
 			log_level = "DEBUG",
 			language = "English", -- Explicit default to avoid nil errors
 		}, cc_opts or {})
+
+		-- ---------------------------------------------------------------------------
+		-- Shared factory for ACP-based adapters (rovodev, rovo).
+		-- Pass a table with:
+		--   name           string   adapter key / id
+		--   formatted_name string   human-readable label
+		--   commands       table    argv list to spawn the ACP process, e.g. {"acli","rovodev","acp"}
+		--   env            table    (optional) environment table to pass to the process
+		--   auth           function (optional) auth handler; receives self, must return bool
+		-- ---------------------------------------------------------------------------
+		local function make_acp_adapter(opts)
+			local helpers = require("codecompanion.adapters.acp.helpers")
+			return {
+				name = opts.name,
+				type = "acp",
+				formatted_name = opts.formatted_name,
+				roles = {
+					llm = "assistant",
+					user = "user",
+				},
+				opts = {
+					verbose_output = true,
+				},
+				env = opts.env or vim.fn.environ(),
+				commands = {
+					default = opts.commands,
+				},
+				defaults = {
+					timeout = 60000, -- 60 seconds
+					-- Rovo ACP requires this field; keep it empty unless you explicitly want MCP forwarding.
+					mcpServers = {},
+				},
+				parameters = {
+					protocolVersion = 1,
+					clientCapabilities = {
+						fs = { readTextFile = true, writeTextFile = true },
+					},
+					clientInfo = {
+						name = "CodeCompanion.nvim",
+						version = "1.0.0",
+					},
+				},
+				handlers = {
+					setup = function()
+						return true
+					end,
+					auth = opts.auth or function()
+						-- Return false so CodeCompanion falls through to send the
+						-- `authenticate` RPC to the process.  The ACP binary
+						-- requires the JSON-RPC authenticate handshake (methodId =
+						-- "product-login") regardless of env-var presence; returning
+						-- true here would skip that call and cause session/new to fail.
+						return false
+					end,
+					form_messages = function(self, messages, capabilities)
+						return helpers.form_messages(self, messages, capabilities)
+					end,
+					on_exit = function() end,
+				},
+			}
+		end
 
 		local codecompanion = require("codecompanion")
 		codecompanion.setup({
@@ -233,142 +299,112 @@ return {
 					opencode = "opencode",
 					claude_code = "claude_code",
 					rovodev = function()
-						local helpers = require("codecompanion.adapters.acp.helpers")
-						return {
+						-- Build the env table: inherit the full environment, then overlay
+						-- credentials read from the acli config file and macOS keychain.
+						local env = vim.fn.environ()
+
+						local function read_rovodev_config()
+							local config_path = (vim.env.HOME or "") .. "/.config/acli/rovodev_config.yaml"
+							local f = io.open(config_path, "r")
+							if not f then
+								return nil, nil
+							end
+							local content = f:read("*a")
+							f:close()
+							local email = content:match("email:%s*([^\n]+)")
+							local account_id = content:match("accountId:%s*([^\n]+)")
+							if email then
+								email = email:match("^%s*(.-)%s*$")
+							end
+							if account_id then
+								account_id = account_id:match("^%s*(.-)%s*$")
+							end
+							return email, account_id
+						end
+
+						-- Retrieve API token from macOS keychain via `security` CLI.
+						-- The stored value is prefixed with "go-keyring-base64:" and base64-encoded.
+						local function read_keychain_token()
+							local handle = io.popen("security find-generic-password -s 'acli' -w 2>/dev/null")
+							if not handle then
+								return nil
+							end
+							local raw = handle:read("*a")
+							handle:close()
+							raw = raw and raw:match("^%s*(.-)%s*$") or ""
+							if raw == "" then
+								return nil
+							end
+							-- Strip the go-keyring-base64: prefix then base64-decode
+							local b64 = raw:match("^go%-keyring%-base64:(.+)$") or raw
+							local dec_handle =
+								io.popen(string.format("printf '%%s' '%s' | base64 -d 2>/dev/null", b64))
+							if not dec_handle then
+								return nil
+							end
+							local token = dec_handle:read("*a")
+							dec_handle:close()
+							token = token and token:match("^%s*(.-)%s*$") or ""
+							return token ~= "" and token or nil
+						end
+
+						local cfg_email, _ = read_rovodev_config()
+						local keychain_token = read_keychain_token()
+
+						env.USER_EMAIL = cfg_email or env.USER_EMAIL or vim.env.USER_EMAIL
+						env.USER_API_TOKEN = keychain_token or env.USER_API_TOKEN or vim.env.USER_API_TOKEN
+
+						return make_acp_adapter({
 							name = "rovodev",
-							type = "acp",
 							formatted_name = "Atlassian RovoDev",
-							roles = {
-								llm = "assistant",
-								user = "user",
-							},
-							opts = {
-								verbose_output = true,
-							},
-							env = (function()
-								-- IMPORTANT: ensure the spawned `acli` process inherits a full environment
-								local env = vim.fn.environ()
+							commands = { "acli", "rovodev", "acp" },
+							env = env,
+							-- Ensure the spawned `acli` process sees these values.
+							-- (CodeCompanion also passes env via ACP, but exporting is a safe fallback.)
+							auth = function(self)
+								-- Prefer values resolved at adapter-init time (from keychain / config file),
+								-- then fall back to the current Neovim environment as a last resort.
+								local email = (self.env_replaced and self.env_replaced.USER_EMAIL)
+									or vim.env.USER_EMAIL
+								local token = (self.env_replaced and self.env_replaced.USER_API_TOKEN)
+									or vim.env.USER_API_TOKEN
 
-								-- Read email and accountId from ~/.config/acli/rovodev_config.yaml
-								local function read_rovodev_config()
-									local config_path = (vim.env.HOME or "") .. "/.config/acli/rovodev_config.yaml"
-									local f = io.open(config_path, "r")
-									if not f then
-										return nil, nil
-									end
-									local content = f:read("*a")
-									f:close()
-									local email = content:match("email:%s*([^\n]+)")
-									local account_id = content:match("accountId:%s*([^\n]+)")
-									if email then
-										email = email:match("^%s*(.-)%s*$")
-									end
-									if account_id then
-										account_id = account_id:match("^%s*(.-)%s*$")
-									end
-									return email, account_id
+								if email and email ~= "" then
+									vim.env.USER_EMAIL = email
+								end
+								if token and token ~= "" then
+									vim.env.USER_API_TOKEN = token
 								end
 
-								-- Retrieve API token from macOS keychain via `security` CLI.
-								-- The stored value is prefixed with "go-keyring-base64:" and base64-encoded.
-								local function read_keychain_token()
-									local handle = io.popen("security find-generic-password -s 'acli' -w 2>/dev/null")
-									if not handle then
-										return nil
-									end
-									local raw = handle:read("*a")
-									handle:close()
-									raw = raw and raw:match("^%s*(.-)%s*$") or ""
-									if raw == "" then
-										return nil
-									end
-									-- Strip the go-keyring-base64: prefix then base64-decode
-									local b64 = raw:match("^go%-keyring%-base64:(.+)$") or raw
-									local dec_handle =
-										io.popen(string.format("printf '%%s' '%s' | base64 -d 2>/dev/null", b64))
-									if not dec_handle then
-										return nil
-									end
-									local token = dec_handle:read("*a")
-									dec_handle:close()
-									token = token and token:match("^%s*(.-)%s*$") or ""
-									return token ~= "" and token or nil
+								if not ((email and email ~= "") and (token and token ~= "")) then
+									vim.notify(
+										"RovoDev CLI: could not resolve USER_EMAIL / USER_API_TOKEN. "
+											.. "Check ~/.config/acli/rovodev_config.yaml and the 'acli' macOS keychain entry.",
+										vim.log.levels.ERROR
+									)
 								end
 
-								local cfg_email, _ = read_rovodev_config()
-								local keychain_token = read_keychain_token()
+								-- Return false so CodeCompanion falls through to send the
+								-- `authenticate` RPC to the acli process.  acli rovodev acp
+								-- requires the JSON-RPC authenticate handshake (methodId =
+								-- "product-login") regardless of env-var presence; returning
+								-- true here would skip that call and cause session/new to fail.
+								return false
+							end,
+						})
+					end,
 
-								env.USER_EMAIL = cfg_email or env.USER_EMAIL or vim.env.USER_EMAIL
-								env.USER_API_TOKEN = keychain_token or env.USER_API_TOKEN or vim.env.USER_API_TOKEN
-								return env
-							end)(),
-
-							commands = {
-								default = {
-									"acli",
-									"rovodev",
-									"acp",
-								},
-							},
-							defaults = {
-								timeout = 60000, -- 60 seconds
-								-- Rovo ACP requires this field; keep it empty unless you explicitly want MCP forwarding.
-								mcpServers = {},
-							},
-							parameters = {
-								protocolVersion = 1,
-								clientCapabilities = {
-									fs = { readTextFile = true, writeTextFile = true },
-								},
-								clientInfo = {
-									name = "CodeCompanion.nvim",
-									version = "1.0.0",
-								},
-							},
-							handlers = {
-								setup = function()
-									return true
-								end,
-
-								-- Ensure the spawned `acli` process sees these values.
-								-- (CodeCompanion also passes env via ACP, but exporting is a safe fallback.)
-								auth = function(self)
-									-- Prefer values resolved at adapter-init time (from keychain / config file),
-									-- then fall back to the current Neovim environment as a last resort.
-									local email = (self.env_replaced and self.env_replaced.USER_EMAIL)
-										or vim.env.USER_EMAIL
-									local token = (self.env_replaced and self.env_replaced.USER_API_TOKEN)
-										or vim.env.USER_API_TOKEN
-
-									if email and email ~= "" then
-										vim.env.USER_EMAIL = email
-									end
-									if token and token ~= "" then
-										vim.env.USER_API_TOKEN = token
-									end
-
-									if not ((email and email ~= "") and (token and token ~= "")) then
-										vim.notify(
-											"RovoDev CLI: could not resolve USER_EMAIL / USER_API_TOKEN. "
-												.. "Check ~/.config/acli/rovodev_config.yaml and the 'acli' macOS keychain entry.",
-											vim.log.levels.ERROR
-										)
-									end
-
-									-- Return false so CodeCompanion falls through to send the
-									-- `authenticate` RPC to the acli process.  acli rovodev acp
-									-- requires the JSON-RPC authenticate handshake (methodId =
-									-- "product-login") regardless of env-var presence; returning
-									-- true here would skip that call and cause session/new to fail.
-									return false
-								end,
-
-								form_messages = function(self, messages, capabilities)
-									return helpers.form_messages(self, messages, capabilities)
-								end,
-								on_exit = function() end,
-							},
-						}
+					-- Rovo: standalone `rovo` binary, manages its own auth via ~/.rovo/config.yml.
+					-- Structurally identical to rovodev; only the binary and config path differ.
+					rovo = function()
+						return make_acp_adapter({
+							name = "rovo",
+							formatted_name = "Atlassian Rovo",
+							commands = { "rovo", "acp" },
+							-- `rovo` manages its own authentication internally; no credential
+							-- injection needed. Inherit the full environment as-is.
+							env = vim.fn.environ(),
+						})
 					end,
 				},
 				http = {
