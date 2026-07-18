@@ -54,7 +54,12 @@ local function setup_clipboard()
 	end
 end
 
-vim.api.nvim_create_autocmd("UiEnter", {
+-- Run `setup_clipboard` after LazyVim has fully booted. Firing on
+-- `UiEnter` (the previous behaviour) raced against LazyVim's own
+-- `lazyvim/config/options.lua`, which sets `opt.clipboard = ""` on
+-- SSH and would clear the `unnamedplus` value we set below.
+vim.api.nvim_create_autocmd("User", {
+	pattern = "VeryLazy",
 	once = true,
 	callback = function()
 		vim.schedule(setup_clipboard)
