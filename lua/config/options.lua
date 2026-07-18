@@ -46,12 +46,24 @@ local function setup_clipboard()
 	-- falls back to the terminal's own paste key (e.g. Cmd-V / C-S-V in
 	-- WezTerm), which sends text as keyboard input and doesn't go through
 	-- the OSC 52 hook.
+	--
+	-- `paste` is still required to be a table by nvim's clipboard-provider
+	-- schema (see `runtime/autoload/provider/clipboard.vim`). We supply
+	-- no-op functions returning an empty list, which makes `*p` /
+	-- `<C-r>+` paste nothing instead of blocking on an OSC 52 query.
 	if vim.env.SSH_CONNECTION then
+		local empty = function()
+			return {}
+		end
 		vim.g.clipboard = {
 			name = "OSC 52",
 			copy = {
 				["+"] = require("vim.ui.clipboard.osc52").copy("+"),
 				["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+			},
+			paste = {
+				["+"] = empty,
+				["*"] = empty,
 			},
 		}
 	end
