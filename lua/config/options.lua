@@ -35,20 +35,23 @@ local function setup_clipboard()
 	end
 
 	-- Over SSH there's no local clipboard tool to shell out to, so bridge the
-	-- clipboard through the terminal via OSC 52 instead. The terminal emulator
-	-- (e.g. iTerm2, kitty, WezTerm, Windows Terminal) forwards the escape
-	-- sequence to the local machine's OS clipboard on copy, and (if the
-	-- terminal supports the query response) returns its contents on paste.
+	-- clipboard through the terminal via OSC 52 on the *write* path. The
+	-- terminal emulator (iTerm2, kitty, WezTerm, Windows Terminal, …)
+	-- forwards the escape sequence to the local machine's OS clipboard.
+	--
+	-- We deliberately skip the OSC 52 *read* / paste path: OSC 52 query
+	-- responses are unreliable on many terminals (including WezTerm over
+	-- raw SSH), and `vim.ui.clipboard.osc52.paste` blocks waiting for a
+	-- reply that may never come. Pasting INTO nvim from the OS clipboard
+	-- falls back to the terminal's own paste key (e.g. Cmd-V / C-S-V in
+	-- WezTerm), which sends text as keyboard input and doesn't go through
+	-- the OSC 52 hook.
 	if vim.env.SSH_CONNECTION then
 		vim.g.clipboard = {
 			name = "OSC 52",
 			copy = {
 				["+"] = require("vim.ui.clipboard.osc52").copy("+"),
 				["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-			},
-			paste = {
-				["+"] = require("vim.ui.clipboard.osc52").paste("+"),
-				["*"] = require("vim.ui.clipboard.osc52").paste("*"),
 			},
 		}
 	end
