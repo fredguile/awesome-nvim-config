@@ -7,79 +7,27 @@
 -- vim.g.copilot_node_command = '~/.nvm/versions/node/v20.10.0/bin/node'
 
 local opt = vim.opt
+opt.clipboard = "unnamedplus"
 
--- Sync clipboard between OS and NeoVim after the UI is ready
-local function setup_clipboard()
-	vim.o.clipboard = "unnamedplus"
-
-	local is_wsl2 = vim.fn.has("wsl") == 1 and vim.loop.os_uname().release:match("WSL2")
-	if is_wsl2 then
-		if vim.fn.executable("win32yank.exe") == 0 then
-			vim.notify("win32yank.exe not found; clipboard sync disabled", vim.log.levels.WARN)
-			return
-		end
-
-		vim.g.clipboard = {
-			name = "win32yank-wsl",
-			copy = {
-				["+"] = "win32yank.exe -i --crlf",
-				["*"] = "win32yank.exe -i --crlf",
-			},
-			paste = {
-				["+"] = "win32yank.exe -o --crlf",
-				["*"] = "win32yank.exe -o --crlf",
-			},
-			cache_enabled = 0,
-		}
-		return
-	end
-
-	-- Over SSH there's no local clipboard tool to shell out to, so bridge the
-	-- clipboard through the terminal via OSC 52 on the *write* path. The
-	-- terminal emulator (iTerm2, kitty, WezTerm, Windows Terminal, …)
-	-- forwards the escape sequence to the local machine's OS clipboard.
-	--
-	-- We deliberately skip the OSC 52 *read* / paste path: OSC 52 query
-	-- responses are unreliable on many terminals (including WezTerm over
-	-- raw SSH), and `vim.ui.clipboard.osc52.paste` blocks waiting for a
-	-- reply that may never come. Pasting INTO nvim from the OS clipboard
-	-- falls back to the terminal's own paste key (e.g. Cmd-V / C-S-V in
-	-- WezTerm), which sends text as keyboard input and doesn't go through
-	-- the OSC 52 hook.
-	--
-	-- `paste` is still required to be a table by nvim's clipboard-provider
-	-- schema (see `runtime/autoload/provider/clipboard.vim`). We supply
-	-- no-op functions returning an empty list, which makes `*p` /
-	-- `<C-r>+` paste nothing instead of blocking on an OSC 52 query.
-	if vim.env.SSH_CONNECTION then
-		local empty = function()
-			return {}
-		end
-		vim.g.clipboard = {
-			name = "OSC 52",
-			copy = {
-				["+"] = require("vim.ui.clipboard.osc52").copy("+"),
-				["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-			},
-			paste = {
-				["+"] = empty,
-				["*"] = empty,
-			},
-		}
-	end
+if vim.fn.has("wsl") == 1 and vim.fn.executable("win32yank.exe") == 1 then
+	vim.g.clipboard = "win32yank"
+elseif vim.env.SSH_CONNECTION then
+	vim.g.clipboard = {
+		name = "OSC 52 (copy only)",
+		copy = {
+			["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+			["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+		},
+		paste = {
+			["+"] = function()
+				return {}
+			end,
+			["*"] = function()
+				return {}
+			end,
+		},
+	}
 end
-
--- Run `setup_clipboard` after LazyVim has fully booted. Firing on
--- `UiEnter` (the previous behaviour) raced against LazyVim's own
--- `lazyvim/config/options.lua`, which sets `opt.clipboard = ""` on
--- SSH and would clear the `unnamedplus` value we set below.
-vim.api.nvim_create_autocmd("User", {
-	pattern = "VeryLazy",
-	once = true,
-	callback = function()
-		vim.schedule(setup_clipboard)
-	end,
-})
 
 -- Configure tab to use space characters, never tab characters
 opt.expandtab = true
