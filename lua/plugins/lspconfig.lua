@@ -283,6 +283,8 @@ return {
 			"tsgo", -- TypeScript 7 Go-based language server
 			"google-java-format", -- Used to format Java code
 			"graphql-language-service-cli", -- Provides graphql-lsp
+			"basedpyright", -- Python LSP
+			"ruff", -- Python formatter + linter (replaces black, isort, flake8)
 		})
 		require("mason-tool-installer").setup({
 			ensure_installed = ensure_installed,
