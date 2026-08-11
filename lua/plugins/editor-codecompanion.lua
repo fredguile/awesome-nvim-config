@@ -6,11 +6,32 @@ return {
 		"ikatyang/tree-sitter-yaml",
 		"ravitemer/codecompanion-history.nvim",
 		{
+			-- Full default config (applies to plain *.md files too) lives in
+			-- editor-render-markdown.lua; lazy.nvim deep-merges `opts` across spec
+			-- fragments for the same plugin, so we only declare the minimal overrides
+			-- that are actually specific to rendering inside a CodeCompanion buffer.
 			"MeanderingProgrammer/render-markdown.nvim",
-			ft = { "markdown", "codecompanion" },
 			opts = {
-				render_modes = true,
-				sign = { enabled = false },
+				overrides = {
+					filetype = {
+						-- CodeCompanion renders its chat in a side panel that's only ~33% of
+						-- the screen width, so tables need a more compact layout to avoid
+						-- ugly wrapping/truncation. `normal` skips the extra top/bottom
+						-- border lines (`cell = "trimmed"` is already the root default).
+						codecompanion = {
+							pipe_table = {
+								style = "normal",
+							},
+							-- Chat messages are mostly prose, not tables, so keep soft-wrap
+							-- on even in rendered view here (root config turns wrap off for
+							-- rendered markdown by default, to protect wide tables in *.md
+							-- files, which doesn't apply the same way in a chat panel).
+							win_options = {
+								wrap = { rendered = true },
+							},
+						},
+					},
+				},
 			},
 		},
 	},
