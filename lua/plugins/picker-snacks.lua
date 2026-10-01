@@ -1,13 +1,3 @@
-local filetypes = {
-	{ text = "markdown" },
-	{ text = "javascript" },
-	{ text = "javascriptreact" },
-	{ text = "lua" },
-	{ text = "python" },
-	{ text = "typescript" },
-	{ text = "typescriptreact" },
-}
-
 local function get_git_root_directory(path)
 	local function is_git_repo(dir)
 		local git_dir = dir .. "/.git"
@@ -64,6 +54,28 @@ end
 return {
 	"folke/snacks.nvim",
 	enabled = true,
+	init = function()
+		-- Workaround: Snacks' preview runs `:normal! zzze` (preview.lua, Preview:loc) via nvim_win_call while the
+		-- picker input is in insert mode. That leaves insert mode and moves the input cursor one column left, so
+		-- fast typing ends up reordered ("fetch" -> "etchf"). Restore the input cursor after the preview is placed.
+		vim.api.nvim_create_autocmd("User", {
+			pattern = "VeryLazy",
+			once = true,
+			callback = function()
+				local Preview = require("snacks.picker.core.preview")
+				local orig_loc = Preview.loc
+				Preview.loc = function(self, ...)
+					local win = vim.api.nvim_get_current_win()
+					local pos = vim.fn.mode():sub(1, 1) == "i" and vim.api.nvim_win_get_cursor(win)
+					local ret = orig_loc(self, ...)
+					if pos and vim.api.nvim_win_is_valid(win) then
+						pcall(vim.api.nvim_win_set_cursor, win, pos)
+					end
+					return ret
+				end
+			end,
+		})
+	end,
 	opts = {
 		picker = {
 			layout = {
@@ -280,21 +292,6 @@ return {
 				})
 			end,
 			desc = "Files Changed vs main",
-		},
-		-- Scratch
-		{
-			"<F9>",
-			function()
-				require("utils.snacks.scratch").new_scratch(filetypes)
-			end,
-			desc = "Toggle Scratch Buffer",
-		},
-		{
-			"<F10>",
-			function()
-				require("utils.snacks.scratch").select_scratch()
-			end,
-			desc = "Select Scratch Buffer",
 		},
 	},
 }
