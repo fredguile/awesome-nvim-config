@@ -5,10 +5,10 @@ return {
 	{ "sitiom/nvim-numbertoggle" }, -- Relative numbers on only for current buffer in Normal mode
 	{ "chrisgrieser/nvim-early-retirement", config = true, event = "VeryLazy" }, -- Auto-close inactive buffers
 	{ "navarasu/onedark.nvim" },
-	{ "windwp/nvim-autopairs", event = "InsertEnter" },
 	{ "lukas-reineke/indent-blankline.nvim", main = "ibl" },
 
 	-- Disable Plugins
+	{ "windwp/nvim-autopairs", enabled = false }, -- Conflicts with mini.pairs (duplicate autopair, caused backtick bug in pickers)
 	{ "nvim-neo-tree/neo-tree.nvim", enabled = false }, -- Replaced with mini.files
 	{ "akinsho/bufferline.nvim", enabled = false }, -- Disable buffer tabs
 	{ "lukas-reineke/indent-blankline.nvim", enabled = false },
