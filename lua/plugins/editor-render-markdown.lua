@@ -26,5 +26,16 @@ return {
 				rendered = false,
 			},
 		},
+		-- render-markdown re-applies `win_options` on every update, which undoes
+		-- a manual `:set wrap`. Re-apply the per buffer preference stored by the
+		-- `<leader>ww` keymap (see lua/util/wrap.lua) after each render/clear.
+		on = {
+			render = function(ctx)
+				require("util.wrap").apply(ctx.win)
+			end,
+			clear = function(ctx)
+				require("util.wrap").apply(ctx.win)
+			end,
+		},
 	},
 }

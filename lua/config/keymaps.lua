@@ -60,6 +60,13 @@ map("n", "ycc", "yygccp", { remap = true })
 map("n", "<leader>w\\", "<C-w>v", { desc = "Split vertical" })
 map("n", "<leader>w-", "<C-w>s", { desc = "Split horizontal" })
 
+-- Toggle soft wrap ("fit to screen") for the current buffer.
+-- The preference is stored per buffer (b:wrap_fit) and re-applied by
+-- render-markdown.nvim, which resets `wrap` on every update.
+map("n", "<leader>ww", function()
+	require("util.wrap").toggle()
+end, { desc = "Toggle line wrap (fit screen)" })
+
 -- LazyVim distro keymaps
 -- wk.add({ "<leader>L", group = "LazyVim" })
 map("n", "<leader>Ll", "<cmd>Lazy<CR>", { desc = "lazy.nvim" })
